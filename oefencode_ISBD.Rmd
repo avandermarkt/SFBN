@@ -20,7 +20,7 @@ SFBN <- read.csv('raw_stage_data2.txt', header = FALSE, sep='\t')
 ```
 
 ```{r}
-#remove onservations 
+#remove observations
 SFBN_y100 <- SFBN[rowSums(is.na(SFBN)) != ncol(SFBN), ]
 ```
 
@@ -38,151 +38,60 @@ ignore_stages <- c(1)
 for (current_row in 1:nrow(SFBN_stages)) {
   current_time <- 0
   current_stage <- NA
-  
+
   # start at col 2, col 1 is the ID
   for (current_col in 2:ncol(SFBN_stages)) {
     next_stage <- SFBN_stages[current_row, current_col]
-    
+
     # skip columns without values or that are ignored
     if (is.na(next_stage) || next_stage %in% ignore_stages) {
       next()
     }
-    
+
     if (is.na(current_stage)) {
       current_stage <- next_stage
-      
+
       # matrix of single stage
       stage_long <- matrix(NA, nrow = 1, ncol = 8)
       colnames(stage_long) <- c('id', 'from', 'to', 'trans', 'Tstart', 'Tstop', 'time', 'status')
-      
+
       stage_long[1, 'id'] <- SFBN_stages[current_row, 1]
       stage_long[1, 'from'] <- current_stage
       stage_long[1, 'Tstart'] <- current_time
       stage_long[1, 'Tstop'] <- current_time
       stage_long[1, 'time'] <- 0
     }
-    
+
     if (current_stage != next_stage) {
-      
+
       stage_long[1, 'to'] <- next_stage
       current_stage <- next_stage
-      
+
       SFBN_stages_long <- rbind(SFBN_stages_long, stage_long)
-      
+
       # matrix of single stage
       stage_long <- matrix(NA, nrow = 1, ncol=8)
       colnames(stage_long) <- c('id', 'from', 'to', 'trans', 'Tstart', 'Tstop', 'time', 'status')
-      
+
       stage_long[1, 'id'] <- SFBN_stages[current_row, 1]
       stage_long[1, 'from'] <- current_stage
       stage_long[1, 'Tstart'] <- current_time
       stage_long[1, 'Tstop'] <- current_time
       stage_long[1, 'time'] <- 0
-      
+
     }
-    
+
     current_time <- current_time + 1
     stage_long[1, 'Tstop'] <- stage_long[1, 'Tstop'] + 1
     stage_long[1, 'time'] <- stage_long[1, 'time'] + 1
-    
+
     if (current_time == max_time) {
       break;
     }
   }
-  
+
   stage_long[1, 'to'] <- 0
   SFBN_stages_long <- rbind(SFBN_stages_long, stage_long)
-}
-
-```
-
-
-
-
-
-
-
-
-
-
-
-
-```{r}
-# complete long matrix
-SFBN_stages_long <- matrix(, nrow = 0, ncol=8)
-colnames(SFBN_stages_long) <- c('id', 'from', 'to', 'trans', 'Tstart', 'Tstop', 'time', 'status')
-
-for (x in 1:nrow(SFBN_stages)) {
-  current_stage <- SFBN_stages[x, 2]
-  
-  # matrix of single stage
-  stage_long <- matrix(, nrow = 1, ncol=8)
-  colnames(stage_long) <- c('id', 'from', 'to', 'trans', 'Tstart', 'Tstop', 'time', 'status')
-  
-  stage_long[1, 'id'] <- SFBN_stages[x, 1]
-  stage_long[1, 'from'] <- current_stage
-  stage_long[1, 'Tstart'] <- 0
-  stage_long[1, 'Tstop'] <- 1
-  stage_long[1, 'time'] <- 1
-  
-  for (y in 3:ncol(SFBN_stages)) {
-    val <- SFBN_stages[x, y]
-    if (is.na(val)) {
-      break
-    }
-    
-    if (current_stage != val) {
-      
-      stage_long[1, 'to'] <- val
-      current_stage <- val
-      
-      SFBN_stages_long <- rbind(SFBN_stages_long, stage_long)
-      
-      # matrix of single stage
-      stage_long <- matrix(, nrow = 1, ncol=8)
-      colnames(stage_long) <- c('id', 'from', 'to', 'trans', 'Tstart', 'Tstop', 'time', 'status')
-      
-      stage_long[1, 'id'] <- SFBN_stages[x, 1]
-      stage_long[1, 'from'] <- current_stage
-      stage_long[1, 'Tstart'] <- y - 2
-      stage_long[1, 'Tstop'] <- y - 2
-      stage_long[1, 'time'] <- 0
-      
-    }
-    #doet er een bij
-    stage_long[1, 'Tstop'] <- stage_long[1, 'Tstop'] + 1
-    stage_long[1, 'time'] <- stage_long[1, 'time'] + 1
-  }
-  
-  stage_long[1, 'to'] <- 0
-  SFBN_stages_long <- rbind(SFBN_stages_long, stage_long)
-}
-
-```
-
-```{r}
-# count occurrence of each stage
-SFBN_stage_count <- matrix(, nrow = nrow(SFBN_stages), ncol = 100)
-
-for (x in 1:nrow(SFBN_stages)) {
-  current_stage = 0;
-  stage_col = 0;
-  
-  for (y in 2:ncol(SFBN_stages)) {
-    val <- SFBN_stages[x, y]
-    
-    if (is.na(val)) {
-      break
-    }
-    
-    if (val != current_stage) {
-      current_stage = val;
-      stage_col <- stage_col + 1
-      SFBN_stage_count[x, stage_col] <- 0
-    }
-    
-    SFBN_stage_count[x, stage_col] <- SFBN_stage_count[x, stage_col] + 1
-  }
 }
 
 ```
@@ -197,4 +106,3 @@ library(reshape)
 #reshape variables
 SFBN_simple <- rename(SFBN, c(11="1", 12="1"",13="1"))
 ```
-
