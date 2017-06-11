@@ -1,0 +1,95 @@
+---
+title: "SFBN_wide_format"
+author: "afra"
+date: "11 juni 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+getwd()
+setwd('~/R')
+list.files()
+```
+
+```{r}
+#read data into R
+SFBN <- read.csv('raw_stage_data2.txt', header = FALSE, sep='\t')
+```
+
+```{r}
+#remove rijen met NA
+SFBN_y100 <- SFBN[rowSums(is.na(SFBN)) != ncol(SFBN), ]
+```
+
+```{r}
+#gedeeld door 10, om naar stages te gaan
+SFBN_stages <- cbind(SFBN_y100[, 1], floor(SFBN_y100[, 2:ncol(SFBN_y100)] / 10))
+```
+
+```{r}
+SFBN_wide <- matrix(NA, nrow = nrow(SFBN_stages), ncol = 10)
+colnames(SFBN_wide) <- c("ID", "stage2", "stage2.s", "stage3.1", "stage3.1.s", "stage4", "stage4.s", "stage3.2", "stage3.2.s", "startstage")
+
+for(current_row in 1:nrow(SFBN_stages)) {
+  prev_stage <- 0
+  SFBN_wide[current_row, "ID"] <- SFBN_stages[current_row, 1]
+  for(current_col in 2:ncol(SFBN_stages)) {
+    cur_stage <- SFBN_stages[current_row, current_col]
+    
+    if(is.na(cur_stage)){
+      break
+    }
+    
+    if (prev_stage == cur_stage){
+      next()
+    }
+    
+    if (cur_stage == 2) {
+      SFBN_wide[current_row, "stage2"] <- current_col
+      SFBN_wide[current_row, "stage2.s"] <- 1
+      SFBN_wide[current_row, "startstage"] <- SFBN_y100[current_row, current_col]
+    }
+    if (cur_stage == 3) {
+      if (prev_stage < 3) {
+        SFBN_wide[current_row, "stage3.1"] <- current_col
+        SFBN_wide[current_row, "stage3.1.s"] <- 1
+      }
+      if (prev_stage > 3) {
+        SFBN_wide[current_row, "stage3.2"] <- current_col
+        SFBN_wide[current_row, "stage3.2.s"] <- 1
+      }
+    }
+    if (cur_stage == 4) {
+      SFBN_wide[current_row, "stage4"] <- current_col
+      SFBN_wide[current_row, "stage4.s"] <- 1
+    }
+    prev_stage <- cur_stage
+  }
+  
+  if (is.na(SFBN_wide[current_row, "stage2"])) {
+    SFBN_wide[current_row, "stage2"] <- current_col
+    SFBN_wide[current_row, "stage2.s"] <- 0
+  }
+  if (is.na(SFBN_wide[current_row, "stage3.1"])) {
+    SFBN_wide[current_row, "stage3.1"] <- current_col
+    SFBN_wide[current_row, "stage3.1.s"] <- 0
+  }
+  if (is.na(SFBN_wide[current_row, "stage4"])) {
+    SFBN_wide[current_row, "stage4"] <- current_col
+    SFBN_wide[current_row, "stage4.s"] <- 0
+  }
+  if (is.na(SFBN_wide[current_row, "stage3.2"])) {
+    SFBN_wide[current_row, "stage3.2"] <- current_col
+    SFBN_wide[current_row, "stage3.2.s"] <- 0
+    
+  }
+}
+
+```
+
+
+
