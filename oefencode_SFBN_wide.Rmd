@@ -1,0 +1,52 @@
+---
+title: "matrix in wide format"
+author: "afra"
+date: "5 juni 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+#packages
+install.packages('mstate')
+library(mstate)
+```
+
+```{r}
+getwd()
+setwd('~/R')
+list.files()
+```
+
+```{r}
+#read data into R
+SFBN <- read.csv('raw_stage_data2.txt', header = FALSE, sep='\t')
+```
+
+```{r}
+#remove onservations 
+SFBN_y100 <- SFBN[rowSums(is.na(SFBN)) != ncol(SFBN), ]
+```
+
+```{r}
+SFBN_stages <- cbind(SFBN_y100[, 1], floor(SFBN_y100[, 2:ncol(SFBN_y100)] / 10))
+```
+
+```{r}
+# Create a matrix named SFBN_wide with columns ID, st1time, st1stat, st2time, st2stat, st3time, st3stat, st4time, st4stat, and covariate 2abc
+# ID = subjectID, st1time = duration of st1, st1stat = st1 present (1) or absent (0)
+
+SFBN_wide <- matrix(NA, nrow = 0, ncol=10)
+colnames(SFBN_wide) <- c('ID', 'st1time', 'st1stat', 'st2time', 'st2stat', 'st3time', 'st3stat', 'st4time', 'st4stat', '2abc')
+
+SFBN_wide$ID <- SFBN_stages$ID
+
+
+
+
+
+```
+

@@ -121,12 +121,14 @@ paths(tmat)
 ```
 
 ```{r}
-# Change data from wide into long format 
 # Hier gaat het fout, ID en startstage kloppen niet
-
+# Change data from wide into long format 
+# Ik heb id = "id" toegevoegd omdat hij anders error: arguments imply differing number of rows: 331, 99 geeft
 covs <- "startstage"
 
 sfbnlong <- msprep(time = c( "stage2", "stage31", "stage4", "stage32"), status = c(  "stage2.s", "stage31.s", "stage4.s", "stage32.s"), id = "id", data = SFBN_wide, trans = tmat, keep = covs) 
+
+# als ID is toegevoegd, dan kan startstage worden toegevoegd middels cbind. 
 ```
 
 ```{r}
@@ -140,22 +142,11 @@ head(expcovs)
 
 
 ```{r}
-# Markov model with stratified hazards
+# example Mills: MODEL 1 Markov model with stratified hazards
 # onze data is Markov want risk hangt niet af van voorgaand risk
 
 c1 <-coxph(Surv(Tstart, Tstop, status) ~ (startstage + strata(trans)), data=sfbnlong,
 method="breslow")
 
-summary(c1)
+list(c1)
 ```
-```{r}
-#use msfit function to plot the estimated cumulative transition intensities in the multi-state model
-# msfit(object, newdata, variance=TRUE, vartype=c("aalen","greenwood"), trans)
-
-# new data, to check whether results are the same for transition 1 as
-# those in appendix E.1 of Therneau & Grambsch (2000)
-
-newdata <- data.frame(trans=1:3,x1.1=c(0,0,0),x2.2=c(0,1,0),strata=1:3)
-msfit(c1,newdata,trans=tmat)
-```
-
