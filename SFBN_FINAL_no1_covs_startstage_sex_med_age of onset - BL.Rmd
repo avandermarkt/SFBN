@@ -1,0 +1,213 @@
+---
+title: "new version SFBN, stage4 after two years_with covs"
+author: "afra"
+date: "27 juni 2017"
+output:
+  pdf_document: default
+  html_document: default
+---
+
+```{r}
+getwd()
+setwd('~/R')
+list.files()
+```
+
+```{r}
+install.packages("mstate")
+library(mstate)
+```
+
+```{r}
+# This whole chunck is to prepare a dataset in wide format + covariates:
+
+# In the database, 11 is stage 1a, 12 is stage 1b, 21 stage 2a etc
+SFBN <- read.csv('2017-07-10_Data RSBD_stage4natweejaar.txt', header = FALSE, sep='\t')
+covariates <- read.csv('2017-08-01_covariates.txt', header = TRUE, sep='\t')
+
+# Remove rows on the bottom with NA
+SFBN_y100 <- SFBN[rowSums(is.na(SFBN)) != ncol(SFBN), ]
+covariates <- covariates[rowSums(is.na(covariates)) != ncol(covariates), ]
+
+# Divide by 10, in order to have stages 1 - 4 (eg 11 -> 1)
+SFBN_stages <- cbind(SFBN_y100[, 1], floor(SFBN_y100[, 2:ncol(SFBN_y100)] / 10))
+
+# Loop through data to construct Wide Matrix with stages 1, 2, 3.1, 4, 3.2 and status (present y/n) 
+# also, add covariate startstage, which shows whether the subj started in stage 2a (21), 2b (22), 2c (23) or 2d (24)
+SFBN_wide <- matrix(NA, nrow = nrow(SFBN_stages), ncol = 10)
+colnames(SFBN_wide) <- c("ID", "stage2", "stage2.s", "stage3.1", "stage3.1.s", "stage4", "stage4.s", "stage3.2", "stage3.2.s", "startstage")
+
+ignore <- c(1)
+max_time <- 61
+
+for(current_row in 1:nrow(SFBN_stages)) {
+  time <- 0
+  prev_stage <- 0
+  
+  SFBN_wide[current_row, "ID"] <- SFBN_stages[current_row, 1]
+  
+  for(current_col in 2:ncol(SFBN_stages)) {
+    current_stage <- SFBN_stages[current_row, current_col]
+    
+    if (is.na(current_stage)) {
+      break
+    }
+    
+    if (current_stage %in% ignore) {
+      next()
+    }
+    
+    if (time == max_time) {
+      break
+    }
+    
+    time <- time + 1
+    
+    if (prev_stage == current_stage) {
+      next()
+    }
+    
+    if (current_stage == 2) {
+      SFBN_wide[current_row, "stage2"] <- time
+      SFBN_wide[current_row, "stage2.s"] <- 1
+      SFBN_wide[current_row, "startstage"] <- SFBN_y100[current_row, current_col]
+    }
+    if (current_stage == 3) {
+      if (prev_stage < 3) {
+        SFBN_wide[current_row, "stage3.1"] <- time
+        SFBN_wide[current_row, "stage3.1.s"] <- 1
+      }
+      if (prev_stage > 3) {
+        SFBN_wide[current_row, "stage3.2"] <- time
+        SFBN_wide[current_row, "stage3.2.s"] <- 1
+      }
+    }
+    if (current_stage == 4) {
+      SFBN_wide[current_row, "stage4"] <- time
+      SFBN_wide[current_row, "stage4.s"] <- 1
+    }
+    prev_stage <- current_stage
+    
+  }
+  
+  if (is.na(SFBN_wide[current_row, "stage2"])) {
+    SFBN_wide[current_row, "stage2"] <- time
+    SFBN_wide[current_row, "stage2.s"] <- 0
+  }
+  if (is.na(SFBN_wide[current_row, "stage3.1"])) {
+    SFBN_wide[current_row, "stage3.1"] <- time
+    SFBN_wide[current_row, "stage3.1.s"] <- 0
+  }
+  if (is.na(SFBN_wide[current_row, "stage4"])) {
+    SFBN_wide[current_row, "stage4"] <- time
+    SFBN_wide[current_row, "stage4.s"] <- 0
+  }
+  if (is.na(SFBN_wide[current_row, "stage3.2"])) {
+    SFBN_wide[current_row, "stage3.2"] <- time
+    SFBN_wide[current_row, "stage3.2.s"] <- 0
+  }
+  if (is.na(SFBN_wide[current_row, "startstage"])) {
+  SFBN_wide[current_row, "startstage"] <- 40
+  }
+}
+
+SFBN_wide[95, "stage4"] <- 1
+
+# age in 3 groups
+covariates$Age.first.episode <- as.numeric(covariates$Age.first.episode)
+covariates$agegroup <- cut(covariates$Age.first.episode, breaks = c(-Inf, 20, Inf), labels = c("early", "interm.late"), right = FALSE)
+
+# re-assign variable names so msprep recognises them. This is added to solve an error, because msprep requires the names function and not colnames
+SFBN_wide <- as.data.frame(SFBN_wide)
+covariates <- as.data.frame(covariates)
+na.omit(SFBN_wide)
+na.omit(covariates)
+
+names(SFBN_wide) <- c("id", "stage2", "stage2.s", "stage3.1", "stage3.1.s", "stage4", "stage4.s", "stage3.2", "stage3.2.s", "startstage")
+names(covariates) <- c("id", "sex", "med", "DOB", "first.ep", "age.first.ep", "BIPIorII", "relative", "agegroup")
+
+# add covariates to wide matrix
+SFBN_wide <- merge(SFBN_wide, covariates, by.x = "id", by.y = "id")
+
+# covariate startstage: 21 + 24 = 1, 22 + 23 = 2
+SFBN_wide$startstage.binary <- ifelse(SFBN_wide$startstage == 21 , "monophasic", ifelse(SFBN_wide$startstage == 24, "monophasic", "biphasic"))
+
+```
+
+
+```{r}
+# make transition matrix
+tmat <- transMat(x = list(c(2, 3), c(3), c(4), c()), names = c("stage2", "stage3.1", "stage4", "stage3.2"))
+
+# look at paths
+paths(tmat)
+```
+
+```{r}
+# Change data from wide into long format 
+# SFBN_wide$dummy = 1 #dummy is added in case of 1 cov because package needs > 1 cov
+
+sfbnlong <- msprep(time = c("stage2", "stage3.1", "stage4", "stage3.2"), status = c("stage2.s", "stage3.1.s", "stage4.s", "stage3.2.s"), id = "id", data = SFBN_wide, trans = tmat , keep = c("startstage.binary", "sex", "agegroup", "BIPIorII", "relative")) 
+```
+
+# End of data prep
+
+# OUTCOMES
+
+```{r}
+# If a competing risks model WITHOUT covariates is considered, the cumulative incidence functions and their standard errors can be calculated by means of Cuminc, possibly stratified by a grouping variable.
+inc <- Cuminc(time = "Tstart", status = "status", data = sfbnlong, na.status=c("remove"), variance=TRUE)
+```
+
+```{r}
+events(sfbnlong)
+```
+
+```{r}
+# Markov Model with stratified hazards: 
+
+# step 1 expand covs
+sfbnlong <- expand.covs(sfbnlong, c("startstage.binary", "sex", "agegroup", "BIPIorII", "relative"), append = TRUE, longnames = TRUE)
+
+# step 2 coxph
+
+c1 <- coxph(Surv(Tstart, Tstop, status) ~ startstage.binarymonophasic.1 + relative.1  + agegroupinterm.late.1 +  sex.1 + startstage.binarymonophasic.2 + relative.2 + agegroupinterm.late.2 + sex.2  +  startstage.binarymonophasic.3 + relative.3 + agegroupinterm.late.3 + sex.3   + startstage.binarymonophasic.4 + relative.4 + agegroupinterm.late.4 +  sex.4 + strata(trans), data=sfbnlong, method="breslow")
+summary(c1)
+```
+
+```{r}
+# Dataprep for plot: 
+
+# use msfit function to calculate the estimated cumulative transition intensities in the multi-state model
+# make newdata: to check whether results are the same for transition 1 as those in appendix E.1 of Therneau & Grambsch (2000)
+
+# covariates must be added to newdata
+newdata <- data.frame(trans=1:4, strata=1:4)
+
+SFBN_msfit <- msfit(c1,newdata,trans=tmat) # (markov, newdata = ?, transitiematrix)
+
+# The function msfit yields the input for probtrans, which function calculates transition probabilities from different starting states and time points, thus enabling dynamic pre- diction. probtrans gives extensive numerical output, which can be studied per se or be used as the basis for graphs.
+probtrans(SFBN_msfit, predt = 0, direction = "forward")
+```
+
+```{r}
+# plot1: Transition plot
+SFBN_cumhaz_nocov_plot <- plot(SFBN_msfit, type=c("single"), xlab="Time in months", ylab="Cumulative hazard", legend=c("stage 2 -> 3","stage 2 -> 4","stage 3 -> 4", "stage 4 -> 3"))
+```
+
+```{r}
+# plot2: stacked transition hazards
+init <- matrix(0, nrow = 309, ncol = 1)
+as.vector(init)
+
+c2 <-coxph(Surv(Tstart, Tstop, status) ~ strata(trans), data= sfbnlong, method= "breslow")
+SFBN_msfit <- msfit(c2,newdata,trans=tmat) 
+pt0 <- probtrans(SFBN_msfit, predt = 0, method = "greenwood")
+
+#use colorspace to make visuals
+library("colorspace")
+statecols <- heat_hcl(5, c = c(80, 30), l = c(30, 90), power = c(1/5, 2))[c(4, 3, 2, 1)]
+ord <- c(1, 2, 3, 4)
+
+plot(pt0, ord = ord, xlab = "Time in months", las = 1, type = "filled", col = statecols[ord],xlim=c(1,60))
+```
